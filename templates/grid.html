@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Security Grid</title>
+    <!-- ag-Grid CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/ag-grid-community@26.2.0/dist/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://unpkg.com/ag-grid-community@26.2.0/dist/styles/ag-theme-alpine.css">
+    <!-- ag-Grid JS -->
+    <script src="https://unpkg.com/ag-grid-community@26.2.0/dist/ag-grid-community.min.noStyle.js"></script>
+    <style>
+      html, body { height: 100%; margin: 0; padding: 0; }
+      .ag-theme-alpine { height: 90%; width: 100%; }
+    </style>
+  </head>
+  <body>
+    <div id="myGrid" class="ag-theme-alpine"></div>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+          var columnDefs = [
+              { headerName: "FIGI", field: "FIGI", sortable: true, filter: true },
+              { headerName: "CUSIP", field: "CUSIP", sortable: true, filter: true },
+              { headerName: "SEDOL", field: "SEDOL", sortable: true, filter: true },
+              { headerName: "ISIN", field: "ISIN", sortable: true, filter: true },
+              { headerName: "COMPANY_NAME", field: "COMPANY_NAME", sortable: true, filter: true },
+              { headerName: "CURRENCY", field: "CURRENCY", sortable: true, filter: true },
+              { headerName: "ASSET_CLASS", field: "ASSET_CLASS", sortable: true, filter: true },
+              { headerName: "ASSET_GROUP", field: "ASSET_GROUP", sortable: true, filter: true }
+          ];
+
+          var gridOptions = {
+              columnDefs: columnDefs,
+              rowData: null,
+              pagination: true,
+              paginationPageSize: 25,
+              onRowClicked: function(event) {
+                  var params = new URLSearchParams();
+                  for (var key in event.data) {
+                      params.append(key, event.data[key]);
+                  }
+                  var url = window.location.origin + "/security_detail?" + params.toString();
+                  window.open(url, "_blank");
+              }
+          };
+
+          var gridDiv = document.getElementById('myGrid');
+          new agGrid.Grid(gridDiv, gridOptions);
+
+          fetch('/data')
+              .then(response => response.json())
+              .then(data => gridOptions.api.setRowData(data))
+              .catch(err => console.error("Error loading data:", err));
+      });
+    </script>
+  </body>
+</html>
