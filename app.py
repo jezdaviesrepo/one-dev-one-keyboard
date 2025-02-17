@@ -1,9 +1,6 @@
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
-import redis
-import psycopg2
-import datetime
-import time
+import redis, psycopg2, datetime
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -80,6 +77,28 @@ def get_security_record_by_date(params, applied_date):
         print("Error querying Postgres by date:", e)
         return {}
 
+### Custom Jinja Filter to detect type ###
+@app.template_filter('detect_type')
+def detect_type(value):
+    try:
+        int(value)
+        return "Integer"
+    except Exception:
+        pass
+    try:
+        float(value)
+        return "Float"
+    except Exception:
+        pass
+    try:
+        datetime.datetime.strptime(value, "%Y-%m-%d")
+        return "Date"
+    except Exception:
+        pass
+    if value.lower() in ['true', 'false']:
+        return "Boolean"
+    return "String"
+
 ### Flask Routes ###
 @app.route("/")
 def index():
@@ -153,26 +172,29 @@ def security_versions():
                "asset_group": rec["asset_group"]} for rec in versions]
     return jsonify(output)
 
-### Socket.IO Integration ###
+@app.route("/company_detail")
+def company_detail():
+    # Get company name from query parameters
+    company_name = request.args.get("company_name", "")
+    # Render a new template for company detail
+    return render_template("company_detail.html", company_name=company_name)
 
-@socketio.on('connect')
-def handle_connect():
-    print("Client connected")
-    # Emit initial update count (e.g., count of keys in Redis)
-    count = len(redis_client.keys("*"))
-    emit('update_count', {'count': count})
-
-def redis_listener():
-    pubsub = redis_client.pubsub()
-    pubsub.subscribe('redis_updates')
-    for message in pubsub.listen():
-        if message['type'] == 'message':
-            # On receiving an update, emit the current count.
-            count = len(redis_client.keys("*"))
-            socketio.emit('update_count', {'count': count})
-
-# Start background listener task.
-socketio.start_background_task(redis_listener)
+@app.route("/company_data")
+def company_data():
+    """Return JSON data filtered by company_name."""
+    company_name = request.args.get("company_name", "").lower()
+    keys = redis_client.keys("*")[:1000]
+    records = []
+    for key in keys:
+        rec = redis_client.hgetall(key)
+        record = {k.decode("utf-8"): v.decode("utf-8") for k, v in rec.items()}
+        # Check if the record's company_name (if exists) matches (case-insensitive)
+        if record.get("company_name", "").lower() == company_name:
+            filtered = {field: record.get(field, "") for field in [
+                "figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"
+            ]}
+            records.append(filtered)
+    return jsonify(records)
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)

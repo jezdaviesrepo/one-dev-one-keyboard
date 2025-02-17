@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <!-- Font Awesome for icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-  <!-- Custom Styles -->
   <style>
     body {
       background-color: #343a40;
@@ -94,6 +93,40 @@
     .history-section td {
       color: #ffffff;
     }
+    .history-extra-header {
+      margin-bottom: 10px;
+    }
+    .small-card {
+      background-color: #2a3f54;
+      border: none;
+      border-radius: 0.3rem;
+      padding: 10px;
+      color: #ffffff;
+      text-align: center;
+      margin-bottom: 5px;
+    }
+    .small-card i {
+      font-size: 1.25rem;
+      margin-bottom: 5px;
+      color: #28a745;
+    }
+    .small-card .card-title {
+      font-size: 0.9rem;
+      margin-bottom: 3px;
+      font-weight: 500;
+    }
+    .small-card .card-text {
+      font-size: 0.85rem;
+      margin: 0;
+    }
+    /* Hyperlink styling for company name */
+    .company-link {
+      color: #ffffff;
+      text-decoration: underline;
+    }
+    .company-link:hover {
+      color: #ffa500;
+    }
   </style>
 </head>
 <body>
@@ -149,8 +182,14 @@
             {% for key, value in record.items() %}
               {% if not key.startswith("field_") and key not in ["applied_date", "days_since_last_update", "age"] %}
                 <tr>
-                  <th style="width:30%;">{{ key }}</th>
-                  <td style="width:70%;">{{ value }}</td>
+                  <th style="width:30%;">{{ key.replace('_',' ')|title }}</th>
+                  <td style="width:70%;">
+                    {% if key|lower == 'company_name' %}
+                      <a href="/company_detail?company_name={{ value | urlencode }}" target="_blank" class="company-link">{{ value }}</a>
+                    {% else %}
+                      {{ value }}
+                    {% endif %}
+                  </td>
                 </tr>
               {% endif %}
             {% endfor %}
@@ -158,22 +197,22 @@
         </table>
       </div>
       
-      <!-- Panel for Dummy Fields with History and Sparkline -->
+      <!-- Panel for Dummy Fields (Security Attributes) -->
       <div class="panel">
-        <h3>Dummy Field History</h3>
+        <h3>Security Attributes</h3>
         <table class="table table-borderless table-panel" id="dummyTable">
           <thead>
             <tr>
-              <th style="width:30%;">Field</th>
-              <th style="width:30%;">Value</th>
-              <th style="width:40%;">Change History (Sparkline)</th>
+              <th style="width:15%;">Field</th>
+              <th style="width:15%;">Value</th>
+              <th style="width:20%;">Change History (Sparkline)</th>
             </tr>
           </thead>
           <tbody>
             {% for key, value in record.items() %}
               {% if key.startswith("field_") %}
                 <tr class="clickable-row" data-field="{{ key }}">
-                  <td><i class="fas fa-plus-circle toggle-icon"></i> {{ key }}</td>
+                  <td><i class="fas fa-plus-circle toggle-icon"></i> {{ key.replace('_',' ')|title }}</td>
                   <td>{{ value }}</td>
                   <td class="sparkline-cell">
                     <span class="sparkline" data-history="{% for version in versions|reverse %}{{ version[key] }}{% if not loop.last %},{% endif %}{% endfor %}"></span>
@@ -181,12 +220,42 @@
                 </tr>
                 <tr class="history-section" id="history-{{ key }}">
                   <td colspan="3">
-                    <h5>History for {{ key }}</h5>
+                    <!-- Extra header area with separate small card sections for Label, Type, Definition -->
+                    <div class="row history-extra-header">
+                      <div class="col-md-4">
+                        <div class="small-card">
+                          <i class="fas fa-tag"></i>
+                          <div class="card-title">Label</div>
+                          <div class="card-text">{{ key.replace('_',' ')|title }}</div>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="small-card">
+                          <i class="fas fa-info-circle"></i>
+                          <div class="card-title">Type</div>
+                          <div class="card-text">
+                            {% if versions and versions[0][key] %}
+                              {{ versions[0][key]|detect_type }}
+                            {% else %}
+                              Unknown
+                            {% endif %}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-4">
+                        <div class="small-card">
+                          <i class="fas fa-book"></i>
+                          <div class="card-title">Definition</div>
+                          <div class="card-text">Lorem ipsum dolor sit amet.</div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- History table: Applied Date and Value -->
                     <table class="table table-sm table-striped">
                       <thead>
                         <tr>
-                          <th>applied_date</th>
-                          <th>value</th>
+                          <th>Applied Date</th>
+                          <th>Value</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -238,7 +307,7 @@
             for(var i = 1; i < values.length; i++){
               changes.push((values[i] !== values[i-1]) ? 1 : 0);
             }
-            $(this).sparkline(changes, { type: 'bar', barColor: '#28a745', height: '30px' });
+            $(this).sparkline(changes, { type: 'bar', barColor: '#ffa500', height: '30px' });
           }
       });
     });
