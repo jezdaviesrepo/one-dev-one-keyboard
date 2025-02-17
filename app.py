@@ -107,7 +107,6 @@ def index():
 @app.route("/data")
 def data():
     keys = redis_client.keys("*")
-    print(keys[:10])
     records = []
     for key in keys:
         rec = redis_client.hgetall(key)

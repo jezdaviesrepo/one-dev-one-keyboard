@@ -88,36 +88,47 @@
     .toggle-icon {
       margin-right: 8px;
     }
-    .history-section table,
-    .history-section th,
-    .history-section td {
-      color: #ffffff;
+    /* Updated history table header styling */
+    .history-section table thead th {
+      background-color: #2a2a2a; /* Dark gray header */
+      color: #ffffff !important;
+      font-weight: bold;
+      border: 1px solid #555;
+      padding: 8px;
     }
-    /* Extra header area: three separate mini-cards styled like small jumbotrons */
+    .history-section table tbody td {
+      background-color: #3a3a3a; /* Slightly lighter dark gray for body */
+      border: 1px solid #555;
+      color: #ffffff !important;
+      padding: 8px;
+    }
+    /* Extra header: three separate mini jumbotron cards */
     .extra-header-row {
       margin-bottom: 10px;
     }
     .mini-jumbotron {
-      background-color: #3a3a3a; /* Darker gray */
+      background-color: #2a2a2a;
       border-radius: 0.3rem;
       padding: 10px;
       color: #ffffff;
       text-align: center;
       margin-bottom: 10px;
+      font-size: 1.1rem;
+      height: 80px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     .mini-jumbotron i {
-      font-size: 1.25rem;
       margin-bottom: 5px;
-      color: #ffffff; /* white icons */
+      color: #ffffff;
     }
-    .mini-jumbotron .detail-title {
-      font-size: 1rem;
+    .mini-jumbotron .detail-label {
       font-weight: 600;
     }
     .mini-jumbotron .detail-text {
       font-size: 0.9rem;
     }
-    /* Hyperlink styling for company name */
     .company-link {
       color: #ffffff;
       text-decoration: underline;
@@ -126,7 +137,6 @@
       color: #ffa500;
     }
   </style>
-  <!-- Enable Bootstrap tooltips -->
   <script>
     document.addEventListener("DOMContentLoaded", function(){
       $(function () {
@@ -136,20 +146,17 @@
   </script>
 </head>
 <body>
-  <!-- Navbar -->
   <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
     <a class="navbar-brand" href="#">Jez Bank</a>
   </nav>
   
   <div class="container">
     {% if record %}
-      <!-- Jumbotron Header for Asset Class and Asset Group -->
       <div class="jumbotron jumbotron-custom">
         <h1>{{ record.asset_class }}</h1>
         <h2>{{ record.asset_group }}</h2>
       </div>
       
-      <!-- Row for Time Metrics -->
       <div class="row info-row">
         <div class="col-md-4">
           <div class="card info-card">
@@ -180,7 +187,6 @@
         </div>
       </div>
       
-      <!-- Panel for Fixed (Non-Dummy) Fields -->
       <div class="panel">
         <h3>Fixed Security Information</h3>
         <table class="table table-borderless table-panel">
@@ -206,7 +212,6 @@
         </table>
       </div>
       
-      <!-- Panel for Dummy Fields (Security Attributes) -->
       <div class="panel">
         <h3>Security Attributes</h3>
         <table class="table table-borderless table-panel" id="dummyTable">
@@ -229,17 +234,16 @@
                 </tr>
                 <tr class="history-section" id="history-{{ key }}">
                   <td colspan="3">
-                    <!-- Extra header area: three separate mini jumbotron-like cards -->
                     <div class="row extra-header-row">
                       <div class="col-md-4">
-                        <div class="mini-jumbotron">
+                        <div class="jumbotron mini-jumbotron">
                           <i class="fas fa-tag"></i>
                           <div class="detail-label">Label</div>
                           <div class="detail-text">{{ key.replace('_',' ')|title }}</div>
                         </div>
                       </div>
                       <div class="col-md-4">
-                        <div class="mini-jumbotron">
+                        <div class="jumbotron mini-jumbotron">
                           <i class="fas fa-info-circle"></i>
                           <div class="detail-label">Type</div>
                           <div class="detail-text">
@@ -252,15 +256,14 @@
                         </div>
                       </div>
                       <div class="col-md-4">
-                        <div class="mini-jumbotron">
+                        <div class="jumbotron mini-jumbotron">
                           <i class="fas fa-book"></i>
                           <div class="detail-label">Definition</div>
                           <div class="detail-text">Lorem ipsum dolor sit amet.</div>
                         </div>
                       </div>
                     </div>
-                    <!-- History table showing only Applied Date and Value -->
-                    <table class="table table-sm table-striped">
+                    <table class="table table-bordered table-hover table-striped">
                       <thead>
                         <tr>
                           <th>Applied Date</th>
@@ -269,11 +272,18 @@
                       </thead>
                       <tbody>
                         {% for version in versions %}
-                          <tr>
+                          <tr class="history-row" {% if loop.index > 5 %}style="display: none;"{% endif %}>
                             <td>{{ version.applied_date }}</td>
                             <td>{{ version[key] }}</td>
                           </tr>
                         {% endfor %}
+                        {% if versions|length > 5 %}
+                          <tr class="show-more-row">
+                            <td colspan="2" class="text-center">
+                              <button class="btn btn-sm btn-outline-light show-more-btn" data-field="{{ key }}">Show More</button>
+                            </td>
+                          </tr>
+                        {% endif %}
                       </tbody>
                     </table>
                   </td>
@@ -295,7 +305,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>
   <script>
     $(document).ready(function(){
-      // Toggle history section on dummy field row click.
       $(".clickable-row").click(function(){
         var field = $(this).data("field");
         $("#history-" + field).toggle();
@@ -307,7 +316,6 @@
         }
       });
       
-      // Initialize sparklines for dummy fields.
       $('.sparkline').each(function(){
           var historyStr = $(this).data('history');
           if(historyStr) {
@@ -318,6 +326,12 @@
             }
             $(this).sparkline(changes, { type: 'bar', barColor: '#ffa500', height: '30px' });
           }
+      });
+      
+      $(".show-more-btn").click(function(){
+          var field = $(this).data("field");
+          $("#history-" + field + " .history-row").show();
+          $(this).closest(".show-more-row").hide();
       });
     });
   </script>
