@@ -5,6 +5,8 @@
   <title>Security Detail</title>
   <!-- Bootstrap CSS -->
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
   <!-- Custom Styles -->
   <style>
     body {
@@ -15,8 +17,12 @@
     .navbar {
       background-color: #23272b;
     }
+    .navbar-brand {
+      font-weight: bold;
+      font-size: 1.75rem;
+    }
     .jumbotron-custom {
-      background-color: #6c757d; /* dark gray */
+      background-color: #6c757d;
       color: #fff;
       padding: 2rem 1rem;
       margin-bottom: 20px;
@@ -32,18 +38,42 @@
       font-weight: 300;
       margin-bottom: 0;
     }
-    .fixed-panel {
+    .info-row {
+      margin-bottom: 20px;
+    }
+    .info-card {
+      background-color: #495057;
+      border: none;
+      border-radius: 0.5rem;
+      margin-bottom: 10px;
+    }
+    .info-card .card-body {
+      padding: 1rem;
+      text-align: center;
+    }
+    .info-card .card-body i {
+      font-size: 2rem;
+    }
+    .info-card .card-title {
+      margin-top: 0.5rem;
+      font-size: 1.25rem;
+    }
+    .info-card .card-text {
+      font-size: 1rem;
+      font-weight: bold;
+    }
+    .panel {
       background-color: #495057;
       border-radius: 0.5rem;
       padding: 20px;
       margin-bottom: 20px;
     }
-    .fixed-panel h3 {
+    .panel h3 {
       border-bottom: 1px solid #adb5bd;
       padding-bottom: 10px;
       margin-bottom: 20px;
     }
-    .table-fixed {
+    .table-panel {
       color: #ffffff;
     }
     .clickable-row {
@@ -55,6 +85,14 @@
     }
     .sparkline-cell {
       width: 120px;
+    }
+    .toggle-icon {
+      margin-right: 8px;
+    }
+    .history-section table,
+    .history-section th,
+    .history-section td {
+      color: #ffffff;
     }
   </style>
 </head>
@@ -72,10 +110,58 @@
         <h2>{{ record.asset_group }}</h2>
       </div>
       
-      <!-- Panel for Fixed Fields -->
-      <div class="fixed-panel">
-        <h3>Security Information</h3>
-        <table class="table table-borderless table-fixed" id="detailTable">
+      <!-- Row for Time Metrics -->
+      <div class="row info-row">
+        <div class="col-md-4">
+          <div class="card info-card">
+            <div class="card-body">
+              <i class="fas fa-calendar-alt"></i>
+              <h5 class="card-title">Applied Date</h5>
+              <p class="card-text">{{ record.applied_date }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card info-card">
+            <div class="card-body">
+              <i class="fas fa-clock"></i>
+              <h5 class="card-title">Days Since Last Update</h5>
+              <p class="card-text">{{ record.days_since_last_update }}</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card info-card">
+            <div class="card-body">
+              <i class="fas fa-hourglass-half"></i>
+              <h5 class="card-title">Age (in days)</h5>
+              <p class="card-text">{{ record.age }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Panel for Fixed (Non-Dummy) Fields -->
+      <div class="panel">
+        <h3>Fixed Security Information</h3>
+        <table class="table table-borderless table-panel">
+          <tbody>
+            {% for key, value in record.items() %}
+              {% if not key.startswith("field_") and key not in ["applied_date", "days_since_last_update", "age"] %}
+                <tr>
+                  <th style="width:30%;">{{ key }}</th>
+                  <td style="width:70%;">{{ value }}</td>
+                </tr>
+              {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Panel for Dummy Fields with History and Sparkline -->
+      <div class="panel">
+        <h3>Dummy Field History</h3>
+        <table class="table table-borderless table-panel" id="dummyTable">
           <thead>
             <tr>
               <th style="width:30%;">Field</th>
@@ -85,44 +171,39 @@
           </thead>
           <tbody>
             {% for key, value in record.items() %}
-              {% if key != "applied_date" %}
-              <tr class="clickable-row" data-field="{{ key }}">
-                <td>{{ key }}</td>
-                <td>{{ value }}</td>
-                <td class="sparkline-cell">
-                  <span class="sparkline" data-history="{% for version in versions|reverse %}{{ version[key] }}{% if not loop.last %},{% endif %}{% endfor %}"></span>
-                </td>
-              </tr>
-              <tr class="history-section" id="history-{{ key }}">
-                <td colspan="3">
-                  <h5>History for {{ key }}</h5>
-                  <table class="table table-sm table-striped">
-                    <thead>
-                      <tr>
-                        <th>applied_date</th>
-                        <th>value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for version in versions %}
+              {% if key.startswith("field_") %}
+                <tr class="clickable-row" data-field="{{ key }}">
+                  <td><i class="fas fa-plus-circle toggle-icon"></i> {{ key }}</td>
+                  <td>{{ value }}</td>
+                  <td class="sparkline-cell">
+                    <span class="sparkline" data-history="{% for version in versions|reverse %}{{ version[key] }}{% if not loop.last %},{% endif %}{% endfor %}"></span>
+                  </td>
+                </tr>
+                <tr class="history-section" id="history-{{ key }}">
+                  <td colspan="3">
+                    <h5>History for {{ key }}</h5>
+                    <table class="table table-sm table-striped">
+                      <thead>
                         <tr>
-                          <td>{{ version.applied_date }}</td>
-                          <td>{{ version[key] }}</td>
+                          <th>applied_date</th>
+                          <th>value</th>
                         </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </td>
-              </tr>
+                      </thead>
+                      <tbody>
+                        {% for version in versions %}
+                          <tr>
+                            <td>{{ version.applied_date }}</td>
+                            <td>{{ version[key] }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
               {% endif %}
             {% endfor %}
           </tbody>
         </table>
-      </div>
-      
-      <!-- Display applied_date separately -->
-      <div class="mb-4">
-        <h4>Applied Date: {{ record.applied_date }}</h4>
       </div>
       
     {% else %}
@@ -136,20 +217,26 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>
   <script>
     $(document).ready(function(){
-      // Toggle history section when a row is clicked.
+      // Toggle history section on dummy field row click.
       $(".clickable-row").click(function(){
         var field = $(this).data("field");
         $("#history-" + field).toggle();
+        var icon = $(this).find(".toggle-icon");
+        if(icon.hasClass("fa-plus-circle")){
+          icon.removeClass("fa-plus-circle").addClass("fa-minus-circle");
+        } else {
+          icon.removeClass("fa-minus-circle").addClass("fa-plus-circle");
+        }
       });
       
-      // Initialize sparkline for each element with class 'sparkline'
+      // Initialize sparklines for dummy fields.
       $('.sparkline').each(function(){
           var historyStr = $(this).data('history');
           if(historyStr) {
             var values = historyStr.split(',');
             var changes = [];
             for(var i = 1; i < values.length; i++){
-              changes.push( (values[i] !== values[i-1]) ? 1 : 0 );
+              changes.push((values[i] !== values[i-1]) ? 1 : 0);
             }
             $(this).sparkline(changes, { type: 'bar', barColor: '#28a745', height: '30px' });
           }
