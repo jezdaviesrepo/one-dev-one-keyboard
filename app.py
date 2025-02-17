@@ -9,14 +9,16 @@ app = Flask(__name__)
 redis_client = redis.Redis(host="localhost", port=6379, db=0)
 
 ### Postgres Helpers ###
+
 def get_latest_security_record(params):
     fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
           SELECT * FROM security_master 
           WHERE {where_clause}
-          ORDER BY "applied_date" DESC LIMIT 1;
+          ORDER BY applied_date DESC LIMIT 1;
           """
+    print(sql)
     values = [params.get(field, "") for field in fields]
     try:
         conn = psycopg2.connect(dbname="postgres", user="postgres", password="postgres",
@@ -32,14 +34,13 @@ def get_latest_security_record(params):
         return {}
 
 def get_all_security_versions(params):
-    print('x', params)
     fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
-          SELECT DISTINCT ON ("applied_date") *
+          SELECT DISTINCT ON (applied_date) *
           FROM security_master 
           WHERE {where_clause}
-          ORDER BY "applied_date" DESC;
+          ORDER BY applied_date DESC;
           """
     print(sql)
     values = [params.get(field, "") for field in fields]
@@ -62,7 +63,7 @@ def get_security_record_by_date(params, applied_date):
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
           SELECT * FROM security_master 
-          WHERE {where_clause} AND "applied_date" = %s 
+          WHERE {where_clause} AND applied_date = %s 
           LIMIT 1;
           """
     values = [params.get(field, "") for field in fields] + [applied_date]
@@ -89,7 +90,7 @@ def index():
 def data():
     """
     Returns up to 1000 security records from Redis.
-    Each record is stored as a hash under keys with prefix "security:".
+    Each record is stored as a hash.
     Only the first 8 key fields are returned.
     """
     keys = redis_client.keys("*")[:1000]
@@ -120,7 +121,7 @@ def security_detail():
 def security_detail_json():
     """
     Returns JSON for a specific version.
-    Expects the 8 key fields and an APPLIED_DATE.
+    Expects the 8 key fields and an applied_date.
     """
     key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     params = { field: request.args.get(field, "") for field in key_fields }
@@ -132,13 +133,13 @@ def security_detail_json():
 def security_versions():
     """
     Returns JSON for version history.
-    Each object includes APPLIED_DATE and the 8 key fields.
+    Each object includes applied_date and the 8 key fields.
     """
-    print('get security versions')
     key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     params = { field: request.args.get(field, "") for field in key_fields }
-    print('y', params, request.args)
+    print('>...', params)
     versions = get_all_security_versions(params)
+    print(versions)
     output = [{"applied_date": rec["applied_date"],
                "figi": rec["figi"],
                "cusip": rec["cusip"],
