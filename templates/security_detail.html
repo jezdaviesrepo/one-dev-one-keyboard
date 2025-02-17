@@ -304,7 +304,13 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-sparklines/2.1.2/jquery.sparkline.min.js"></script>
   <script>
+    // Function to determine if a string is a date in YYYY-MM-DD format.
+    function isDate(str) {
+      return /^\d{4}-\d{2}-\d{2}$/.test(str.trim());
+    }
+  
     $(document).ready(function(){
+      // Toggle history section on dummy field row click.
       $(".clickable-row").click(function(){
         var field = $(this).data("field");
         $("#history-" + field).toggle();
@@ -316,22 +322,46 @@
         }
       });
       
+      // Initialize sparkline for each dummy field.
       $('.sparkline').each(function(){
-          var historyStr = $(this).data('history');
-          if(historyStr) {
-            var values = historyStr.split(',');
+        var historyStr = $(this).data('history');
+        if(historyStr) {
+          // Split and trim values
+          var rawValues = historyStr.split(',').map(function(v){ return v.trim(); });
+          // Convert to numbers
+          var numericValues = rawValues.map(function(val){ return parseFloat(val); });
+          // Check that all values are numeric and non-empty
+          var allNumeric = rawValues.every(function(val){ return val !== "" && !isNaN(val); });
+          
+          // If all values are numeric and the first value is not a date, render a line chart.
+          if(allNumeric && !isDate(rawValues[0])) {
+            $(this).sparkline(numericValues, { 
+              type: 'line', 
+              lineColor: '#ffa500', 
+              fillColor: false, 
+              width: '100px', 
+              height: '30px'
+            });
+          } else {
+            // Otherwise, compute changes and render a bar chart.
             var changes = [];
-            for(var i = 1; i < values.length; i++){
-              changes.push((values[i] !== values[i-1]) ? 1 : 0);
+            for(var i = 1; i < rawValues.length; i++){
+              changes.push((rawValues[i] !== rawValues[i-1]) ? 1 : 0);
             }
-            $(this).sparkline(changes, { type: 'bar', barColor: '#ffa500', height: '30px' });
+            $(this).sparkline(changes, { 
+              type: 'bar', 
+              barColor: '#ffa500', 
+              height: '30px'
+            });
           }
+        }
       });
       
+      // "Show More" functionality for history table rows (limit to 5 initially)
       $(".show-more-btn").click(function(){
-          var field = $(this).data("field");
-          $("#history-" + field + " .history-row").show();
-          $(this).closest(".show-more-row").hide();
+        var field = $(this).data("field");
+        $("#history-" + field + " .history-row").show();
+        $(this).closest(".show-more-row").hide();
       });
     });
   </script>
