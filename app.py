@@ -10,12 +10,12 @@ redis_client = redis.Redis(host="localhost", port=6379, db=0)
 
 ### Postgres Helpers ###
 def get_latest_security_record(params):
-    fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
-          SELECT * FROM dummy_security_master 
+          SELECT * FROM security_master 
           WHERE {where_clause}
-          ORDER BY "APPLIED_DATE" DESC LIMIT 1;
+          ORDER BY "applied_date" DESC LIMIT 1;
           """
     values = [params.get(field, "") for field in fields]
     try:
@@ -32,15 +32,18 @@ def get_latest_security_record(params):
         return {}
 
 def get_all_security_versions(params):
-    fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    print('x', params)
+    fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
-          SELECT DISTINCT ON ("APPLIED_DATE") *
-          FROM dummy_security_master 
+          SELECT DISTINCT ON ("applied_date") *
+          FROM security_master 
           WHERE {where_clause}
-          ORDER BY "APPLIED_DATE" DESC;
+          ORDER BY "applied_date" DESC;
           """
+    print(sql)
     values = [params.get(field, "") for field in fields]
+    print(values)
     try:
         conn = psycopg2.connect(dbname="postgres", user="postgres", password="postgres",
                                 host="localhost", port=5432)
@@ -55,11 +58,11 @@ def get_all_security_versions(params):
         return []
 
 def get_security_record_by_date(params, applied_date):
-    fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     where_clause = " AND ".join([f'"{field}" = %s' for field in fields])
     sql = f"""
-          SELECT * FROM dummy_security_master 
-          WHERE {where_clause} AND "APPLIED_DATE" = %s 
+          SELECT * FROM security_master 
+          WHERE {where_clause} AND "applied_date" = %s 
           LIMIT 1;
           """
     values = [params.get(field, "") for field in fields] + [applied_date]
@@ -89,13 +92,13 @@ def data():
     Each record is stored as a hash under keys with prefix "security:".
     Only the first 8 key fields are returned.
     """
-    keys = redis_client.keys("security:*")[:1000]
+    keys = redis_client.keys("*")[:1000]
     records = []
     for key in keys:
         rec = redis_client.hgetall(key)
         record = {k.decode("utf-8"): v.decode("utf-8") for k, v in rec.items()}
         filtered = {field: record.get(field, "") for field in [
-            "FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"
+            "figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"
         ]}
         records.append(filtered)
     return jsonify(records)
@@ -107,7 +110,7 @@ def security_detail():
     Expects query parameters for the 8 key fields.
     Queries Postgres for the latest full record and all version history.
     """
-    key_fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     params = { field: request.args.get(field, "") for field in key_fields }
     record = get_latest_security_record(params)
     versions = get_all_security_versions(params)
@@ -119,12 +122,11 @@ def security_detail_json():
     Returns JSON for a specific version.
     Expects the 8 key fields and an APPLIED_DATE.
     """
-    key_fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     params = { field: request.args.get(field, "") for field in key_fields }
-    applied_date = request.args.get("APPLIED_DATE", "")
+    applied_date = request.args.get("applied_date", "")
     record = get_security_record_by_date(params, applied_date)
     return jsonify(record)
-
 
 @app.route("/security_versions")
 def security_versions():
@@ -132,18 +134,20 @@ def security_versions():
     Returns JSON for version history.
     Each object includes APPLIED_DATE and the 8 key fields.
     """
-    key_fields = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP"]
+    print('get security versions')
+    key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
     params = { field: request.args.get(field, "") for field in key_fields }
+    print('y', params, request.args)
     versions = get_all_security_versions(params)
-    output = [{"APPLIED_DATE": rec["APPLIED_DATE"],
-               "FIGI": rec["FIGI"],
-               "CUSIP": rec["CUSIP"],
-               "SEDOL": rec["SEDOL"],
-               "ISIN": rec["ISIN"],
-               "COMPANY_NAME": rec["COMPANY_NAME"],
-               "CURRENCY": rec["CURRENCY"],
-               "ASSET_CLASS": rec["ASSET_CLASS"],
-               "ASSET_GROUP": rec["ASSET_GROUP"]} for rec in versions]
+    output = [{"applied_date": rec["applied_date"],
+               "figi": rec["figi"],
+               "cusip": rec["cusip"],
+               "sedol": rec["sedol"],
+               "isin": rec["isin"],
+               "company_name": rec["company_name"],
+               "currency": rec["currency"],
+               "asset_class": rec["asset_class"],
+               "asset_group": rec["asset_group"]} for rec in versions]
     return jsonify(output)
 
 if __name__ == "__main__":

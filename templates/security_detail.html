@@ -4,75 +4,91 @@
   <meta charset="utf-8">
   <title>Security Detail</title>
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-  <!-- ag-Grid CSS for the version grid -->
+  <!-- ag-Grid CSS for version grid -->
   <link rel="stylesheet" href="https://unpkg.com/ag-grid-community@26.2.0/dist/styles/ag-grid.css">
   <link rel="stylesheet" href="https://unpkg.com/ag-grid-community@26.2.0/dist/styles/ag-theme-alpine.css">
   <style>
-    .card-header .row > div { padding: 0 10px; }
-    .top-panel table { width: 100%; }
-    .top-panel th, .top-panel td { padding: 5px; text-align: left; }
-    .bottom-panel .field-box {
+    /* Top panel table styling */
+    .top-panel table {
+      width: 100%;
+    }
+    .top-panel th, .top-panel td {
+      padding: 5px;
+      text-align: left;
+    }
+    /* Additional details styling: display in rows of three columns */
+    .additional-fields .field-box {
       border: 1px solid #dee2e6;
       padding: 10px;
       margin-bottom: 10px;
       background-color: #f8f9fa;
     }
-    .ag-theme-alpine { height: 300px; width: 100%; }
+    .ag-theme-alpine {
+      height: 300px;
+      width: 100%;
+    }
+    /* Position checkbox in top header (right aligned) */
+    .header-checkbox {
+      float: right;
+    }
   </style>
 </head>
 <body>
 <div class="container mt-4">
   {% if record %}
-    <!-- Detail Panel -->
-    <div class="card mb-4" id="detailCard">
+    <!-- Top Panel: Primary Fields -->
+    <div class="card mb-4" id="topPanel">
       <div class="card-header">
-        <div class="row">
-          <div class="col-md-6">
-            <h5><strong>Asset Class:</strong> <span id="detailAssetClass">{{ record.ASSET_CLASS }}</span></h5>
+        <div class="d-flex justify-content-between align-items-center">
+          <h5 class="mb-0">Security Overview</h5>
+          <!-- Single Checkbox in the header -->
+          <div class="form-check header-checkbox">
+            <input type="checkbox" id="filterValues" class="form-check-input">
+            <label for="filterValues" class="form-check-label">Hide Empty Additional Fields</label>
           </div>
-          <div class="col-md-6">
-            <h5><strong>Asset Group:</strong> <span id="detailAssetGroup">{{ record.ASSET_GROUP }}</span></h5>
-          </div>
-        </div>
-        <div class="mt-2">
-          <table class="table table-bordered">
-            <tbody>
-              {% set top_keys = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP", "APPLIED_DATE"] %}
-              {% for key in top_keys %}
-              <tr>
-                <th style="width:30%;">{{ key }}</th>
-                <td id="detail-{{ key }}">{{ record.get(key, "") }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
         </div>
       </div>
-      <div class="card-body bottom-panel" id="bottomPanel">
-        {% set bottom_keys = [] %}
-        {% for key, value in record.items() %}
-          {% if key not in top_keys %}
-            {% set _ = bottom_keys.append(key) %}
-          {% endif %}
-        {% endfor %}
+      <div class="card-body top-panel">
+        <table class="table table-bordered" id="topTable">
+          <tbody>
+            {% set top_keys = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group", "applied_date"] %}
+            {% for key in top_keys %}
+              <tr>
+                <th style="width: 30%;">{{ key }}</th>
+                <td id="detail-{{ key }}">{{ record.get(key, "") }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Additional Details Panel -->
+    {% set bottom_keys = [] %}
+    {% for key, value in record.items() %}
+      {% if key not in top_keys %}
+        {% set _ = bottom_keys.append(key) %}
+      {% endif %}
+    {% endfor %}
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5>Additional Details</h5>
+      </div>
+      <div class="card-body additional-fields" id="bottomPanel">
         <div class="row" id="bottomFields">
           {% for key in bottom_keys %}
             <div class="col-md-4 field-box">
-              <strong>{{ key }}:</strong> <span class="field-value" id="detail-{{ key }}">{{ record.get(key, "") }}</span>
+              <strong>{{ key }}:</strong> <span class="field-value">{{ record.get(key, "") }}</span>
             </div>
             {% if loop.index % 3 == 0 and not loop.last %}
               </div><div class="row" id="bottomFields">
             {% endif %}
           {% endfor %}
         </div>
-        <div class="form-check mt-2">
-          <input type="checkbox" id="filterValues" class="form-check-input">
-          <label for="filterValues" class="form-check-label">Only show fields with values</label>
-        </div>
       </div>
     </div>
     
-    <!-- Version History Grid -->
+    <!-- Version History Grid Panel (at the bottom) -->
     <div class="card">
       <div class="card-header">
         <h5>Version History</h5>
@@ -81,6 +97,7 @@
         <div id="versionsGrid" class="ag-theme-alpine"></div>
       </div>
     </div>
+    
   {% else %}
     <div class="alert alert-warning" role="alert">
       No record found.
@@ -88,13 +105,14 @@
   {% endif %}
 </div>
   
-<!-- jQuery and Bootstrap JS -->
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Load jQuery, Popper.js, and Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.min.js"></script>
 <!-- ag-Grid JS -->
 <script src="https://unpkg.com/ag-grid-community@26.2.0/dist/ag-grid-community.min.noStyle.js"></script>
 <script>
-  // Checkbox filtering for bottom panel.
+  // Checkbox filtering for additional details.
   $(document).ready(function(){
     $('#filterValues').change(function(){
       if ($(this).is(':checked')) {
@@ -110,55 +128,36 @@
 
   // Function to update the detail panels with new record data.
   function updateDetail(record) {
-    // Update top panel table.
-    var topKeys = ["FIGI", "CUSIP", "SEDOL", "ISIN", "COMPANY_NAME", "CURRENCY", "ASSET_CLASS", "ASSET_GROUP", "APPLIED_DATE"];
+    var topKeys = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group", "applied_date"];
     topKeys.forEach(function(key) {
       var elem = document.getElementById("detail-" + key);
       if (elem) { elem.innerText = record[key] || ""; }
     });
-    
-    // Update bottom panel.
-    // For simplicity, rebuild the bottom panel.
-    var bottomHTML = "";
     var bottomKeys = [];
     for (var key in record) {
       if (topKeys.indexOf(key) === -1) { bottomKeys.push(key); }
     }
+    var bottomHTML = "";
     for (var i = 0; i < bottomKeys.length; i++) {
-      if (i % 3 === 0) { bottomHTML += "<div class='row' id='bottomFields'>"; }
+      if (i % 3 === 0) { bottomHTML += "<div class='row'>"; }
       bottomHTML += "<div class='col-md-4 field-box'><strong>" + bottomKeys[i] + ":</strong> <span class='field-value'>" + (record[bottomKeys[i]] || "") + "</span></div>";
-      if ((i + 1) % 3 === 0 || i === bottomKeys.length - 1) { bottomHTML += "</div>"; }
+      if ((i+1) % 3 === 0 || i === bottomKeys.length - 1) { bottomHTML += "</div>"; }
     }
-    document.getElementById("bottomPanel").innerHTML = bottomHTML +
-      "<div class='form-check mt-2'>" +
-      "<input type='checkbox' id='filterValues' class='form-check-input'>" +
-      "<label for='filterValues' class='form-check-label'>Only show fields with values</label>" +
-      "</div>";
-    // Reattach the checkbox handler.
-    $('#filterValues').change(function(){
-      if ($(this).is(':checked')) {
-        $('#bottomFields .field-box').each(function(){
-          var text = $(this).find('.field-value').text().trim();
-          if(text === "") { $(this).hide(); }
-        });
-      } else {
-        $('#bottomFields .field-box').show();
-      }
-    });
+    document.getElementById("bottomPanel").innerHTML = bottomHTML;
   }
 
-  // Initialize the version grid.
+  // Initialize the version history grid.
   document.addEventListener('DOMContentLoaded', function() {
     var versionColumnDefs = [
-      { headerName: "APPLIED_DATE", field: "APPLIED_DATE", sortable: true, filter: true, width: 150 },
-      { headerName: "FIGI", field: "FIGI", hide: true },
-      { headerName: "CUSIP", field: "CUSIP", hide: true },
-      { headerName: "SEDOL", field: "SEDOL", hide: true },
-      { headerName: "ISIN", field: "ISIN", hide: true },
-      { headerName: "COMPANY_NAME", field: "COMPANY_NAME", hide: true },
-      { headerName: "CURRENCY", field: "CURRENCY", hide: true },
-      { headerName: "ASSET_CLASS", field: "ASSET_CLASS", hide: true },
-      { headerName: "ASSET_GROUP", field: "ASSET_GROUP", hide: true }
+      { headerName: "applied_date", field: "applied_date", sortable: true, filter: true, width: 150 },
+      { headerName: "figi", field: "figi", hide: true },
+      { headerName: "cusip", field: "cusip", hide: true },
+      { headerName: "sedol", field: "sedol", hide: true },
+      { headerName: "isin", field: "isin", hide: true },
+      { headerName: "company_name", field: "company_name", hide: true },
+      { headerName: "currency", field: "currency", hide: true },
+      { headerName: "asset_class", field: "asset_class", hide: true },
+      { headerName: "asset_group", field: "asset_group", hide: true }
     ];
 
     var versionGridOptions = {
@@ -167,49 +166,44 @@
       pagination: true,
       paginationPageSize: 25,
       onRowClicked: function(event) {
-          // Build query string from the version's data.
           var params = {
-              APPLIED_DATE: event.data.APPLIED_DATE,
-              FIGI: event.data.FIGI,
-              CUSIP: event.data.CUSIP,
-              SEDOL: event.data.SEDOL,
-              ISIN: event.data.ISIN,
-              COMPANY_NAME: event.data.COMPANY_NAME,
-              CURRENCY: event.data.CURRENCY,
-              ASSET_CLASS: event.data.ASSET_CLASS,
-              ASSET_GROUP: event.data.ASSET_GROUP
+              applied_date: event.data.applied_date,
+              figi: event.data.figi,
+              cusip: event.data.cusip,
+              sedol: event.data.sedol,
+              isin: event.data.isin,
+              company_name: event.data.company_name,
+              currency: event.data.currency,
+              asset_class: event.data.asset_class,
+              asset_group: event.data.asset_group
           };
           var queryString = Object.keys(params).map(function(key) {
               return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
           }).join('&');
-          // Fetch the detail JSON for the selected version and update the detail panels.
+          // Fetch detail JSON for the selected version and update detail panels.
           fetch("/security_detail_json?" + queryString)
-              .then(response => response.json())
-              .then(data => {
-                  updateDetail(data);
-              })
-              .catch(error => console.error("Error fetching version detail:", error));
+            .then(response => response.json())
+            .then(data => { updateDetail(data); })
+            .catch(error => console.error("Error fetching version detail:", error));
       }
     };
 
     var gridDiv = document.getElementById("versionsGrid");
     new agGrid.Grid(gridDiv, versionGridOptions);
 
-    // Load version history based on the current record's key fields.
     var params = {
-      FIGI: "{{ record.FIGI }}",
-      CUSIP: "{{ record.CUSIP }}",
-      SEDOL: "{{ record.SEDOL }}",
-      ISIN: "{{ record.ISIN }}",
-      COMPANY_NAME: "{{ record.COMPANY_NAME }}",
-      CURRENCY: "{{ record.CURRENCY }}",
-      ASSET_CLASS: "{{ record.ASSET_CLASS }}",
-      ASSET_GROUP: "{{ record.ASSET_GROUP }}"
+      figi: "{{ record.figi }}",
+      cusip: "{{ record.cusip }}",
+      sedol: "{{ record.sedol }}",
+      isin: "{{ record.isin }}",
+      company_name: "{{ record.company_name }}",
+      currency: "{{ record.currency }}",
+      asset_class: "{{ record.asset_class }}",
+      asset_group: "{{ record.asset_group }}"
     };
     var queryString = Object.keys(params).map(function(key) {
       return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
     }).join('&');
-
     fetch("/security_versions?" + queryString)
       .then(response => response.json())
       .then(data => versionGridOptions.api.setRowData(data))
