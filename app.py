@@ -106,7 +106,8 @@ def index():
 
 @app.route("/data")
 def data():
-    keys = redis_client.keys("*")[:1000]
+    keys = redis_client.keys("*")
+    print(keys[:10])
     records = []
     for key in keys:
         rec = redis_client.hgetall(key)
@@ -183,7 +184,7 @@ def company_detail():
 def company_data():
     """Return JSON data filtered by company_name."""
     company_name = request.args.get("company_name", "").lower()
-    keys = redis_client.keys("*")[:1000]
+    keys = redis_client.keys("*")
     records = []
     for key in keys:
         rec = redis_client.hgetall(key)

@@ -93,31 +93,29 @@
     .history-section td {
       color: #ffffff;
     }
-    .history-extra-header {
+    /* Extra header area: three separate mini-cards styled like small jumbotrons */
+    .extra-header-row {
       margin-bottom: 10px;
     }
-    .small-card {
-      background-color: #2a3f54;
-      border: none;
+    .mini-jumbotron {
+      background-color: #3a3a3a; /* Darker gray */
       border-radius: 0.3rem;
       padding: 10px;
       color: #ffffff;
       text-align: center;
-      margin-bottom: 5px;
+      margin-bottom: 10px;
     }
-    .small-card i {
+    .mini-jumbotron i {
       font-size: 1.25rem;
       margin-bottom: 5px;
-      color: #28a745;
+      color: #ffffff; /* white icons */
     }
-    .small-card .card-title {
+    .mini-jumbotron .detail-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .mini-jumbotron .detail-text {
       font-size: 0.9rem;
-      margin-bottom: 3px;
-      font-weight: 500;
-    }
-    .small-card .card-text {
-      font-size: 0.85rem;
-      margin: 0;
     }
     /* Hyperlink styling for company name */
     .company-link {
@@ -128,6 +126,14 @@
       color: #ffa500;
     }
   </style>
+  <!-- Enable Bootstrap tooltips -->
+  <script>
+    document.addEventListener("DOMContentLoaded", function(){
+      $(function () {
+        $('[data-toggle="tooltip"]').tooltip();
+      });
+    });
+  </script>
 </head>
 <body>
   <!-- Navbar -->
@@ -189,6 +195,9 @@
                     {% else %}
                       {{ value }}
                     {% endif %}
+                    {% if record['mapping_' ~ key] is defined %}
+                      <i class="fas fa-info-circle mapping-info" data-toggle="tooltip" title="{{ record['mapping_' ~ key] }}"></i>
+                    {% endif %}
                   </td>
                 </tr>
               {% endif %}
@@ -220,20 +229,20 @@
                 </tr>
                 <tr class="history-section" id="history-{{ key }}">
                   <td colspan="3">
-                    <!-- Extra header area with separate small card sections for Label, Type, Definition -->
-                    <div class="row history-extra-header">
+                    <!-- Extra header area: three separate mini jumbotron-like cards -->
+                    <div class="row extra-header-row">
                       <div class="col-md-4">
-                        <div class="small-card">
+                        <div class="mini-jumbotron">
                           <i class="fas fa-tag"></i>
-                          <div class="card-title">Label</div>
-                          <div class="card-text">{{ key.replace('_',' ')|title }}</div>
+                          <div class="detail-label">Label</div>
+                          <div class="detail-text">{{ key.replace('_',' ')|title }}</div>
                         </div>
                       </div>
                       <div class="col-md-4">
-                        <div class="small-card">
+                        <div class="mini-jumbotron">
                           <i class="fas fa-info-circle"></i>
-                          <div class="card-title">Type</div>
-                          <div class="card-text">
+                          <div class="detail-label">Type</div>
+                          <div class="detail-text">
                             {% if versions and versions[0][key] %}
                               {{ versions[0][key]|detect_type }}
                             {% else %}
@@ -243,14 +252,14 @@
                         </div>
                       </div>
                       <div class="col-md-4">
-                        <div class="small-card">
+                        <div class="mini-jumbotron">
                           <i class="fas fa-book"></i>
-                          <div class="card-title">Definition</div>
-                          <div class="card-text">Lorem ipsum dolor sit amet.</div>
+                          <div class="detail-label">Definition</div>
+                          <div class="detail-text">Lorem ipsum dolor sit amet.</div>
                         </div>
                       </div>
                     </div>
-                    <!-- History table: Applied Date and Value -->
+                    <!-- History table showing only Applied Date and Value -->
                     <table class="table table-sm table-striped">
                       <thead>
                         <tr>
