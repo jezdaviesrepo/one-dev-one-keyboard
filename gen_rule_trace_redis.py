@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 import redis
 import time
+import json
 from os import cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -109,7 +110,7 @@ def load_inventory_file_to_redis(filepath, key_fields):
         pipe = r.pipeline()
         for row in reader:
             key_values = [row.get(field, "").strip() for field in key_fields]
-            if False and any(v == "" for v in key_values):
+            if any(v == "" for v in key_values):
                 key = f"record:{os.path.basename(filepath)}:{random.randint(100000,999999)}"
             else:
                 key = "|".join(key_values)
@@ -141,36 +142,32 @@ def load_inventory_to_redis(inventory_dir):
             total_loaded += future.result()
     print(f"Total loaded records into Redis: {total_loaded}")
 
-# def load_inventory_to_redis(inventory_dir):
-#     """
-#     Iterates over all CSV files in the inventory directory and loads each row into Redis as a hash.
-#     Constructs the Redis key by concatenating the values of the first 8 model columns.
-#     Also, for each record, adds the key to the sorted set 'security_keys' (using current time as score) for efficient pagination.
-#     """
-#     r = redis.Redis(host="localhost", port=6379, db=0)
-#     files = glob.glob(os.path.join(inventory_dir, "*.csv"))
-#     if not files:
-#         print(f"No CSV files found in directory '{inventory_dir}'.")
-#         return
+# ---------- New: Load Rule Trace to Redis ----------
 
-#     count = 0
-#     # Define the fixed field names (first 8 model columns)
-#     key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"]
-#     for filepath in files:
-#         print(filepath)
-#         with open(filepath, newline="", encoding="utf-8") as csvfile:
-#             reader = csv.DictReader(csvfile)
-#             for row in reader:
-#                 key_values = [row.get(field, "").strip() for field in key_fields]
-#                 if any(v == "" for v in key_values):
-#                     key = f"record:{os.path.basename(filepath)}:{random.randint(100000,999999)}"
-#                 else:
-#                     key = "|".join(key_values)
-#                 r.hset(key, mapping=row)
-#                 # Add the key to a sorted set with current time as score for pagination.
-#                 r.zadd("security_keys", {key: time.time()})
-#                 count += 1
-#     print(f"Loaded {count} records into Redis.")
+def load_rule_trace_to_redis(rule_trace_dir):
+    """
+    Iterates over all CSV files in the rule_trace directory.
+    For each CSV file, reads each row (error/warning record) and pushes it as a JSON string
+    into a Redis list with key "rule_trace".
+    """
+    r = redis.Redis(host="localhost", port=6379, db=0)
+    files = glob.glob(os.path.join(rule_trace_dir, "*.csv"))
+    if not files:
+        print(f"No CSV files found in directory '{rule_trace_dir}'.")
+        return
+    total = 0
+    pipe = r.pipeline()
+    for filepath in files:
+        with open(filepath, newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                # Each row should have a UniqueKey field (from the rule engine report)
+                unique_key = row.get("UniqueKey", "")
+                # We push the entire record as JSON into a list stored under key "rule_trace"
+                pipe.rpush("rule_trace", json.dumps(row))
+                total += 1
+    pipe.execute()
+    print(f"Loaded {total} rule trace records into Redis under key 'rule_trace'.")
 
 # ---------- Main Function ----------
 
@@ -198,6 +195,10 @@ def main():
     
     # Step 5: Load inventory files into Redis concurrently.
     load_inventory_to_redis(inventory_dir)
+    
+    # New Step 6: Load rule trace files from the rule_trace directory into Redis.
+    rule_trace_dir = "rule_trace"
+    load_rule_trace_to_redis(rule_trace_dir)
 
 if __name__ == "__main__":
     main()

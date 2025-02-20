@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Jez Bank</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <style>
+    body {
+      background-color: #343a40;
+      color: #ffffff;
+      padding-top: 70px;
+    }
+    /* Top Navbar */
+    .navbar {
+      background-color: #23272b;
+    }
+    .navbar-brand {
+      font-weight: bold;
+      font-size: 1.75rem;
+    }
+    /* Sidebar */
+    .sidebar {
+      background-color: #23272b;
+      color: #ffffff;
+      height: 100vh;
+      position: fixed;
+      top: 70px;
+      left: 0;
+      width: 250px;
+      padding: 20px;
+      border-right: 1px solid #444;
+    }
+    .sidebar .nav-link {
+      color: #ffffff;
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
+    .sidebar .nav-link:hover {
+      color: #ffa500;
+    }
+    /* Main Content */
+    .main-content {
+      margin-left: 270px;
+      padding: 20px;
+    }
+    /* Dashboard Jumbotron */
+    .jumbotron-dashboard {
+      background-color: #6c757d;
+      color: #fff;
+      padding: 2rem 1rem;
+      margin-bottom: 20px;
+      border-radius: 0.5rem;
+      text-align: center;
+    }
+    .jumbotron-dashboard .dashboard-icon {
+      font-size: 4rem;
+      margin-bottom: 15px;
+    }
+    .jumbotron-dashboard h1 {
+      font-size: 3rem;
+      margin-bottom: 0.5rem;
+    }
+    .jumbotron-dashboard p {
+      font-size: 1.25rem;
+    }
+    /* Chart Containers: each chart occupies full width and fixed height */
+    .chart-container {
+      width: 100%;
+      height: 300px; /* Adjust as needed so both charts fit without scrollbars */
+      margin-bottom: 20px;
+    }
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+  </style>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <!-- Top Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
+    <a class="navbar-brand" href="#">Jez Bank</a>
+  </nav>
+  
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link" href="/dashboard">
+          <i class="fas fa-tachometer-alt"></i> Dashboard
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/vendor_connection">
+          <i class="fas fa-plug"></i> Vendor Connection
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/security_upload">
+          <i class="fas fa-upload"></i> Security Upload
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/securities">
+          <i class="fas fa-shield-alt"></i> Securities
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/legal_entities">
+          <i class="fas fa-balance-scale"></i> Legal Entities
+        </a>
+      </li>
+    </ul>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="main-content">
+    <div class="jumbotron jumbotron-dashboard">
+      <div class="dashboard-icon">
+        <i class="fas fa-tachometer-alt"></i>
+      </div>
+      <h1>Dashboard</h1>
+      <p>Overview of Asset Classes and Asset Groups from Inventory</p>
+    </div>
+    <!-- Bar Chart for Asset Classes -->
+    <div class="chart-container">
+      <canvas id="barChartAssetClasses"></canvas>
+    </div>
+    <!-- Bar Chart for Asset Groups -->
+    <div class="chart-container">
+      <canvas id="barChartAssetGroups"></canvas>
+    </div>
+  </div>
+  
+  <script>
+    // Cache dashboard data in localStorage if not already cached
+    document.addEventListener('DOMContentLoaded', function() {
+      let dashboardData = localStorage.getItem("dashboardData");
+      if (dashboardData) {
+        dashboardData = JSON.parse(dashboardData);
+        createCharts(dashboardData);
+      } else {
+        fetch("/dashboard_data")
+          .then(response => response.json())
+          .then(data => {
+            localStorage.setItem("dashboardData", JSON.stringify(data));
+            createCharts(data);
+          })
+          .catch(error => console.error("Error fetching dashboard data:", error));
+      }
+    });
+    
+    function createCharts(data) {
+      // Data format:
+      // { assetClasses: { "Equity": 150, "Fixed Income": 100, ... },
+      //   assetGroups: { "Domestic Equity": 90, "International Equity": 60, ... } }
+      
+      // Helper to safely get index (supporting both Chart.js v2 and v3)
+      function getElementIndex(activeElements) {
+        if (activeElements.length === 0) return null;
+        let index = activeElements[0].index;
+        if (index === undefined && activeElements[0].element) {
+          index = activeElements[0].element.index;
+        }
+        return index;
+      }
+      
+      // Bar chart for Asset Classes
+      new Chart(document.getElementById('barChartAssetClasses').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data.assetClasses),
+          datasets: [{
+            label: 'Count',
+            data: Object.values(data.assetClasses),
+            backgroundColor: '#36a2eb'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          title: {
+            display: true,
+            text: 'Asset Classes Count'
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          },
+          onClick: function(evt, activeElements) {
+            const index = getElementIndex(activeElements);
+            if (index !== null) {
+              const assetClass = this.data.labels[index];
+              // Redirect to securities page filtered by asset_class
+              window.location.href = "/securities?asset_class=" + encodeURIComponent(assetClass);
+            }
+          }
+        }
+      });
+      
+      // Bar chart for Asset Groups
+      new Chart(document.getElementById('barChartAssetGroups').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data.assetGroups),
+          datasets: [{
+            label: 'Count',
+            data: Object.values(data.assetGroups),
+            backgroundColor: '#ffcd56'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          title: {
+            display: true,
+            text: 'Asset Groups Count'
+          },
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          },
+          onClick: function(evt, activeElements) {
+            const index = getElementIndex(activeElements);
+            if (index !== null) {
+              const assetGroup = this.data.labels[index];
+              // Redirect to securities page filtered by asset_group
+              window.location.href = "/securities?asset_group=" + encodeURIComponent(assetGroup);
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>

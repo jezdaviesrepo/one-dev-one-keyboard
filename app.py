@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+import io, csv, re
 import redis, psycopg2, datetime
 from flask_socketio import SocketIO
 
@@ -20,7 +21,7 @@ def get_latest_security_record(params):
           """
     values = [params.get(field, "") for field in fields]
     try:
-        conn = psycopg2.connect(dbname="postgres", user="postgres", password="postgres",
+        conn = psycopg2.connect(dbname="postgres", user="jez", password="",
                                   host="localhost", port=5432)
         cur = conn.cursor()
         cur.execute(sql, values)
@@ -43,7 +44,7 @@ def get_all_security_versions(params):
           """
     values = [params.get(field, "") for field in fields]
     try:
-        conn = psycopg2.connect(dbname="postgres", user="postgres", password="postgres",
+        conn = psycopg2.connect(dbname="postgres", user="jez", password="",
                                   host="localhost", port=5432)
         cur = conn.cursor()
         cur.execute(sql, values)
@@ -65,7 +66,7 @@ def get_security_record_by_date(params, applied_date):
           """
     values = [params.get(field, "") for field in fields] + [applied_date]
     try:
-        conn = psycopg2.connect(dbname="postgres", user="postgres", password="postgres",
+        conn = psycopg2.connect(dbname="postgres", user="jez", password="",
                                   host="localhost", port=5432)
         cur = conn.cursor()
         cur.execute(sql, values)
@@ -104,8 +105,8 @@ def detect_type(value):
 def index():
     return render_template("grid.html")
 
-@app.route("/data")
-def data():
+@app.route("/dataz")
+def dataz():
     keys = redis_client.keys("*")
     records = []
     for key in keys:
@@ -114,6 +115,33 @@ def data():
         filtered = {field: record.get(field, "") for field in [
             "figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group"
         ]}
+        records.append(filtered)
+    return jsonify(records)
+
+@app.route("/data")
+def data():
+    # Define the key fields to return (including APPLIED_DATE)
+    key_fields = ["figi", "cusip", "sedol", "isin", "company_name", "currency", "asset_class", "asset_group", "applied_date"]
+    
+    # Retrieve filter values from the query string (if any)
+    filter_asset_class = request.args.get("asset_class", "").strip()
+    filter_asset_group = request.args.get("asset_group", "").strip()
+    
+    # Fetch up to 1000 keys from Redis
+    keys = redis_client.keys("*")[:1000]
+    records = []
+    for key in keys:
+        rec = redis_client.hgetall(key)
+        # Decode each field from bytes to strings
+        record = {k.decode("utf-8"): v.decode("utf-8") for k, v in rec.items()}
+        # Apply asset_class filter if provided
+        if filter_asset_class and record.get("asset_class", "").strip() != filter_asset_class:
+            continue
+        # Apply asset_group filter if provided
+        if filter_asset_group and record.get("asset_group", "").strip() != filter_asset_group:
+            continue
+        # Include only the specified key fields in the output
+        filtered = {field: record.get(field, "") for field in key_fields}
         records.append(filtered)
     return jsonify(records)
 
@@ -195,6 +223,109 @@ def company_data():
             ]}
             records.append(filtered)
     return jsonify(records)
+
+# Define regex patterns for validation
+PATTERNS = {
+    "FIGI": r"^BBG[A-Z0-9]{8}\d$",
+    "CUSIP": r"^[A-Z0-9*@#]{9}$",
+    "SEDOL": r"^[A-Z0-9]{7}$",
+    "ISIN": r"^[A-Z]{2}[A-Z0-9]{9}\d$"
+}
+
+@app.route("/upload_soi", methods=["POST"])
+def upload_soi():
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+
+    try:
+        content = file.stream.read()
+        try:
+            decoded = content.decode("utf-8")
+        except UnicodeDecodeError:
+            decoded = content.decode("utf-8-sig")
+        stream = io.StringIO(decoded)
+    except Exception as e:
+        return jsonify({"error": "File decoding error", "details": str(e)}), 400
+
+    reader = csv.DictReader(stream)
+    total_rows = 0
+    error_count = 0
+    error_data = []
+
+    for i, row in enumerate(reader, start=1):
+        total_rows += 1
+        row_errors = []
+        for field, pattern in PATTERNS.items():
+            value = row.get(field, "").strip()
+            # Only check if value is not empty; if it doesn't match the pattern, mark it as an error.
+            if value and not re.match(pattern, value):
+                row_errors.append({
+                    "RowNumber": i,
+                    "UniqueKey": "",  # will be computed below
+                    "Field": field,
+                    "FieldValue": value,
+                    "Issue": "Error",
+                    "Message": f"Value does not match expected pattern for {field}."
+                })
+        if row_errors:
+            error_count += 1
+            unique_key = "|".join([
+                row.get("FIGI", "").strip(),
+                row.get("CUSIP", "").strip(),
+                row.get("SEDOL", "").strip(),
+                row.get("ISIN", "").strip()
+            ])
+            for err in row_errors:
+                err["UniqueKey"] = unique_key
+            error_data.extend(row_errors)
+
+    summary = {
+        "totalRows": total_rows,
+        "errorCount": error_count,
+        "errorData": error_data
+    }
+    return jsonify(summary)
+
+
+
+@app.route("/dashboard")
+def dashboard():
+    return render_template("dashboard.html")
+
+@app.route("/dashboard_data")
+def dashboard_data():
+    asset_classes = {}
+    asset_groups = {}
+    
+    # Iterate over all keys in Redis.
+    # For a large dataset, consider using a SCAN-based approach or storing aggregated counts.
+    for key in redis_client.scan_iter("*"):
+        try:
+            record = redis_client.hgetall(key)
+            # Decode the record from bytes to strings
+            record = {k.decode("utf-8"): v.decode("utf-8") for k, v in record.items()}
+            # Get asset_class and asset_group (default to 'Unknown' if missing)
+            ac = record.get("asset_class", "Unknown")
+            ag = record.get("asset_group", "Unknown")
+            asset_classes[ac] = asset_classes.get(ac, 0) + 1
+            asset_groups[ag] = asset_groups.get(ag, 0) + 1
+        except Exception as e:
+            # Log or skip problematic keys
+            continue
+
+    return jsonify({
+        "assetClasses": asset_classes,
+        "assetGroups": asset_groups
+    })
+
+@app.route("/securities")
+def securities():
+    asset_class = request.args.get("asset_class", "").strip()
+    asset_group = request.args.get("asset_group", "").strip()
+    return render_template("grid.html", asset_class=asset_class, asset_group=asset_group)
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)

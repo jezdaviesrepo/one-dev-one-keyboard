@@ -95,12 +95,27 @@ class SOIGenerator:
         return isin_without_check + self.compute_isin_check_digit(isin_without_check)
 
     def generate_row(self) -> dict:
-        return {
-            self.fields[0]: self.generate_figi(),
-            self.fields[1]: self.generate_cusip(),
-            self.fields[2]: self.generate_sedol(),
-            self.fields[3]: self.generate_isin()
+        """
+        Generates a dictionary with keys FIGI, CUSIP, SEDOL, ISIN.
+        Each value is generated using the respective methods.
+        Additionally, with a 5% probability, one randomly chosen field is corrupted,
+        meaning its value is either set to an empty string or to a deliberately invalid value.
+        """
+        row = {
+            "FIGI": self.generate_figi(),
+            "CUSIP": self.generate_cusip(),
+            "SEDOL": self.generate_sedol(),
+            "ISIN": self.generate_isin()
         }
+        # Inject error with 5% probability for the row: corrupt one of the four fields.
+        if random.random() < 0.05:
+            error_field = random.choice(list(row.keys()))
+            # With 50% chance, set it to empty; otherwise, set to an invalid value.
+            if random.random() < 0.5:
+                row[error_field] = ""
+            else:
+                row[error_field] = "BAD" + error_field  # e.g. BADFIGI
+        return row
 
     def generate_csv(self, num_rows: int, output_filename: str = "soi.csv"):
         with open(output_filename, "w", newline="", encoding="utf-8") as csvfile:

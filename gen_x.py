@@ -3,6 +3,7 @@ import random
 import string
 import datetime
 import os
+import re
 from faker import Faker
 
 fake = Faker()
@@ -32,10 +33,9 @@ def generate_asset_group(asset_class: str) -> str:
     }
     return random.choice(asset_groups.get(asset_class, ["General"]))
 
-# Dummy field generator: now starting with 1.
 def generate_dummy_field_names(num_dummy_fields):
-    start_index = 1  # Dummy fields now start at FIELD_0001
-    return [f"FIELD_{i:04d}" for i in range(start_index, start_index + num_dummy_fields)]
+    # Dummy fields now start at FIELD_0001
+    return [f"FIELD_{i:04d}" for i in range(1, num_dummy_fields + 1)]
 
 def generate_dummy_field_types(dummy_fields):
     possible_types = ["string", "integer", "float", "date"]
@@ -53,7 +53,7 @@ class SecurityMasterGeneratorFromSOI:
         self.vendor_name = vendor_name
         self.num_dummy_fields = num_dummy_fields
         self.underscore_count = underscore_count
-        self.soi_fixed_fields = []  # Expected fixed fields from soi.csv
+        self.soi_fixed_fields = []  # Expected fixed fields from soi.csv (should be 4: FIGI, CUSIP, SEDOL, ISIN)
         self.rows = []              # Rows read from soi.csv
         # Dictionary mapping (asset_class, asset_group) to a set of dummy field base names to leave empty.
         self.empty_pattern = {}
@@ -62,7 +62,7 @@ class SecurityMasterGeneratorFromSOI:
         """Reads the soi.csv file and stores its fixed fields and rows."""
         with open(self.soi_filename, newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-            self.soi_fixed_fields = reader.fieldnames  # For example, 4 columns.
+            self.soi_fixed_fields = reader.fieldnames  # Expected to be 4 columns.
             self.rows = list(reader)
         print(f"Loaded {len(self.rows)} rows from {self.soi_filename} with fixed fields: {self.soi_fixed_fields}")
 
@@ -73,7 +73,8 @@ class SecurityMasterGeneratorFromSOI:
           2. Additional generated fixed columns: COMPANY_NAME, CURRENCY, ASSET_CLASS, ASSET_GROUP.
           3. Dummy columns with headers prefixed by the specified underscores.
           4. A final APPLIED_DATE column (no underscores).
-        Output filename: <vendor_name>_<date>.csv, saved in the root directory.
+        Output filename: <vendor_name>_<today's date>.csv, saved in the root directory.
+        Returns the output filename.
         """
         # Step 1: Fixed fields from soi.csv.
         fixed = self.soi_fixed_fields  # e.g. 4 columns.
@@ -92,7 +93,6 @@ class SecurityMasterGeneratorFromSOI:
         # Combined header.
         output_headers = fixed + generated + dummy_fields_prefixed + final
         
-        # Build output filename.
         current_date = datetime.date.today().isoformat()
         output_filename = f"{self.vendor_name}_{current_date}.csv"
         
@@ -121,8 +121,8 @@ class SecurityMasterGeneratorFromSOI:
                 pair = (asset_class, asset_group)
                 if pair not in self.empty_pattern:
                     total_dummy = len(dummy_fields)
-                    # Choose a percentage between 10% and 20%.
-                    percent = random.uniform(0.1, 0.2)
+                    # Choose a percentage between 40% and 60%.
+                    percent = random.uniform(0.4, 0.6)
                     num_empty = int(round(percent * total_dummy))
                     # Randomly select that many dummy field base names.
                     self.empty_pattern[pair] = set(random.sample(dummy_fields, num_empty))
@@ -140,6 +140,7 @@ class SecurityMasterGeneratorFromSOI:
                 new_row["APPLIED_DATE"] = current_date
                 writer.writerow(new_row)
         print(f"Output file '{output_filename}' generated with {len(self.rows)} rows and {len(output_headers)} columns.")
+        return output_filename
 
     def _generate_value(self, field_type: str) -> str:
         if field_type == "integer":
@@ -153,6 +154,71 @@ class SecurityMasterGeneratorFromSOI:
             return (start_date + datetime.timedelta(days=random.randint(0, delta))).isoformat()
         else:
             return ''.join(random.choices(string.ascii_letters, k=10))
+    
+    def run_rule_engine(self, inventory_filename: str, report_filename: str):
+        """
+        Reads the generated inventory CSV file (which contains:
+            FIGI, CUSIP, SEDOL, ISIN, COMPANY_NAME, CURRENCY, ASSET_CLASS, ASSET_GROUP, APPLIED_DATE)
+        and checks the four security key fields (FIGI, CUSIP, SEDOL, ISIN) for errors.
+          - If a field is empty, records a warning.
+          - If a field does not match the expected regex pattern, records an error.
+        Also computes a unique composite key for each row by concatenating:
+          FIGI, CUSIP, SEDOL, ISIN, COMPANY_NAME, CURRENCY, ASSET_CLASS, ASSET_GROUP, and APPLIED_DATE.
+        Writes a report CSV file with columns:
+           RowNumber, UniqueKey, Field, FieldValue, Issue, Message
+        """
+        # Expected regex patterns.
+        patterns = {
+            "FIGI": r"^BBG[A-Z0-9]{8}\d$",
+            "CUSIP": r"^[A-Z0-9*@#]{9}$",
+            "SEDOL": r"^[A-Z0-9]{7}$",
+            "ISIN": r"^[A-Z]{2}[A-Z0-9]{9}\d$"
+        }
+        issues = []
+        with open(inventory_filename, newline="", encoding="utf-8") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row_index, row in enumerate(reader, start=1):
+                # Compute unique key: concatenate the 9 fields (4 from soi, 4 additional, and APPLIED_DATE)
+                unique_key = (
+                    row.get("FIGI", "") + "|" +
+                    row.get("CUSIP", "") + "|" +
+                    row.get("SEDOL", "") + "|" +
+                    row.get("ISIN", "") + "|" +
+                    row.get("COMPANY_NAME", "") + "|" +
+                    row.get("CURRENCY", "") + "|" +
+                    row.get("ASSET_CLASS", "") + "|" +
+                    row.get("ASSET_GROUP", "") + "|" +
+                    row.get("APPLIED_DATE", "")
+                )
+                # Validate the 4 key fields.
+                for field, pattern in patterns.items():
+                    value = row.get(field, "")
+                    if value == "":
+                        issues.append({
+                            "RowNumber": row_index,
+                            "UniqueKey": unique_key,
+                            "Field": field,
+                            "FieldValue": value,
+                            "Issue": "Warning",
+                            "Message": "Field is empty."
+                        })
+                    else:
+                        if not re.match(pattern, value):
+                            issues.append({
+                                "RowNumber": row_index,
+                                "UniqueKey": unique_key,
+                                "Field": field,
+                                "FieldValue": value,
+                                "Issue": "Error",
+                                "Message": f"Value does not match expected pattern for {field}."
+                            })
+        with open(report_filename, "w", newline="", encoding="utf-8") as csvfile:
+            fieldnames = ["RowNumber", "UniqueKey", "Field", "FieldValue", "Issue", "Message"]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for issue in issues:
+                writer.writerow(issue)
+        print(f"Rule engine report generated: {report_filename}")
 
 if __name__ == "__main__":
     soi_filename = "soi.csv"
@@ -170,4 +236,7 @@ if __name__ == "__main__":
     
     generator = SecurityMasterGeneratorFromSOI(soi_filename, vendor_name, num_dummy_fields, underscore_count)
     generator.read_soi_file()
-    generator.generate_output()
+    inventory_filename = generator.generate_output()
+    
+    report_filename = f"soi_rule_engine_report_{datetime.date.today().isoformat()}.csv"
+    generator.run_rule_engine(inventory_filename, report_filename)

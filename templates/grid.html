@@ -14,8 +14,10 @@
     body {
       background-color: #343a40;
       color: #ffffff;
+      margin: 0;
       padding-top: 70px;
     }
+    /* Top Navbar */
     .navbar {
       background-color: #23272b;
     }
@@ -41,6 +43,69 @@
       padding: 5px 7px;
       border-radius: 50%;
     }
+    /* Sidebar */
+    .sidebar {
+      background-color: #23272b;
+      color: #ffffff;
+      height: 100vh;
+      position: fixed;
+      top: 70px;
+      left: 0;
+      width: 250px;
+      padding: 20px;
+      overflow-y: auto;
+      border-right: 1px solid #444;
+      transition: width 0.3s;
+    }
+    .sidebar.minimized {
+      width: 70px;
+    }
+    .sidebar .toggle-btn {
+      text-align: right;
+      margin-bottom: 20px;
+    }
+    .sidebar .toggle-btn button {
+      background: none;
+      border: none;
+      color: #ffffff;
+      font-size: 1.2rem;
+      outline: none;
+    }
+    .sidebar .nav {
+      list-style: none;
+      padding-left: 0;
+    }
+    .sidebar .nav-item {
+      margin-bottom: 15px;
+    }
+    .sidebar .nav-link {
+      display: flex;
+      align-items: center;
+      color: #ffffff;
+      font-size: 1.1rem;
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    .sidebar .nav-link:hover {
+      color: #ffa500;
+    }
+    .sidebar .nav-link i {
+      margin-right: 12px;
+      width: 20px;
+      text-align: center;
+    }
+    .sidebar.minimized .nav-link span {
+      display: none;
+    }
+    /* Main Content */
+    .main-content {
+      margin-left: 270px;
+      padding: 20px;
+      transition: margin-left 0.3s ease;
+    }
+    .sidebar.minimized ~ .main-content {
+      margin-left: 90px;
+    }
     .jumbotron-inventory {
       background-color: #6c757d;
       color: #fff;
@@ -48,6 +113,7 @@
       margin-bottom: 20px;
       border-radius: 0.5rem;
       text-align: center;
+      height: 10p;
     }
     .jumbotron-inventory h1 {
       font-size: 2.5rem;
@@ -57,6 +123,7 @@
       font-size: 3rem;
       margin-bottom: 0.5rem;
     }
+    /* AG Grid container */
     .ag-theme-alpine {
       width: 100%;
       height: 70vh;
@@ -77,28 +144,195 @@
       color: #c3852e !important;
       font-size: 16px;
     }
-</style>
+    /* Security Upload Modal */
+    .modal-dialog.upload-dialog {
+      max-width: 30%;
+      margin: 1.75rem auto;
+    }
+    .modal-content.upload-content {
+      height: 50vh;
+      background-color: #343a40; /* Use the same background as main body */
+    }
+    .modal-header.upload-header {
+      background-color: #007bff; /* Blue header */
+      color: #ffffff;
+    }
+    .modal-header.upload-header i {
+      margin-right: 10px;
+    }
+    .upload-dropzone {
+      border: 2px dashed #ffffff;
+      border-radius: 5px;
+      padding: 20px;
+      text-align: center;
+      color: #ffffff;
+      margin-bottom: 10px;
+      /* Ensure the drag area is visible */
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    .upload-dropzone.dragover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+    /* Upload Summary Modal (unchanged) */
+    .modal-dialog.summary-dialog {
+      max-width: 60%;
+      margin: 1.75rem auto;
+    }
+    .modal-content.summary-content {
+      height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-body.summary-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 15px;
+    }
+    #errorGrid {
+      width: 100%;
+      flex: 1;
+    }
+    /* Error grid override for white background and black text */
+    #errorGrid.ag-theme-alpine {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+    #errorGrid.ag-theme-alpine .ag-header {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+    #errorGrid.ag-theme-alpine .ag-header-cell-label {
+      color: #000000 !important;
+    }
+    #errorGrid.ag-theme-alpine .ag-row {
+      background-color: #ffffff !important;
+      color: #000000 !important;
+    }
+    /* Upload Summary Modal Header with warning style */
+    .upload-summary-header {
+      background-color: #ffc107;
+      color: #000;
+      padding: 10px;
+      text-align: center;
+      font-weight: bold;
+    }
+    .upload-summary-header i {
+      margin-right: 10px;
+    }
   </style>
 </head>
 <body>
-  <!-- Navbar with update badge -->
+  <!-- Top Navbar with update badge -->
   <nav class="navbar navbar-expand-lg navbar-dark fixed-top">
     <a class="navbar-brand" href="#">Jez Bank</a>
+    <button class="navbar-toggler d-lg-none" type="button" data-toggle="collapse" data-target="#sidebar" 
+            aria-controls="sidebar" aria-expanded="true" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
     <div class="ml-auto update-container">
       <i class="fas fa-bell"></i>
       <span class="badge" id="updateBadge">0</span>
     </div>
   </nav>
   
-  <div class="container-fluid mt-4">
+  <!-- Sidebar -->
+  <div class="sidebar" id="sidebar">
+    <div class="toggle-btn">
+      <button id="minimizeBtn">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    </div>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a class="nav-link" href="/dashboard">
+          <i class="fas fa-tachometer-alt fa-fw"></i>
+          <span>Dashboard</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/vendor_connection">
+          <i class="fas fa-plug fa-fw"></i>
+          <span>Vendor Connect</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="#" data-toggle="modal" data-target="#uploadModal">
+          <i class="fas fa-upload fa-fw"></i>
+          <span>Security Upload</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/securities">
+          <i class="fas fa-shield-alt fa-fw"></i>
+          <span>Securities</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="/legal_entities">
+          <i class="fas fa-balance-scale fa-fw"></i>
+          <span>Legal Entities</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="main-content">
     <div class="jumbotron jumbotron-inventory">
       <div class="inventory-icon">
         <i class="fas fa-shield-alt"></i>
       </div>
       <h1>Security Inventory</h1>
     </div>
-    
     <div id="myGrid" class="ag-theme-alpine"></div>
+  </div>
+  
+  <!-- Security Upload Modal -->
+  <div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+    <div class="modal-dialog upload-dialog">
+      <div class="modal-content upload-content">
+        <div class="modal-header upload-header">
+          <i class="fas fa-upload fa-2x"></i>
+          <h5 class="modal-title" id="uploadModalLabel">Upload Securities</h5>
+          <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" id="uploadModalCloseBtn">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div id="dropzone" class="upload-dropzone">
+            Drag and drop your CSV file here or click to select.
+          </div>
+          <input type="file" id="fileInput" accept=".csv" style="display: none;">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Upload Summary Modal -->
+  <div class="modal fade" id="uploadSummaryModal" tabindex="-1" aria-labelledby="uploadSummaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog summary-dialog">
+      <div class="modal-content summary-content bg-dark text-white">
+        <div class="modal-header">
+          <div class="upload-summary-header w-100">
+            <i class="fas fa-exclamation-triangle"></i> Validation Errors Summary
+          </div>
+          <button type="button" class="close text-white" data-dismiss="modal" aria-label="Close" id="uploadSummaryModalCloseBtn">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-body summary-body">
+          <p id="summaryText"></p>
+          <div id="errorGrid" class="ag-theme-alpine"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-light" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
   </div>
   
   <!-- ag-Grid JS -->
@@ -109,26 +343,33 @@
   <!-- Socket.IO client library -->
   <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
   <script>
+    // Global variable for error grid instance
+    var errorGridInstance = null;
+
     document.addEventListener('DOMContentLoaded', function() {
-      // Establish SocketIO connection.
-      var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
+      // Remove focus when a modal is hidden (accessibility fix)
+      $('#uploadModal, #uploadSummaryModal').on('hidden.bs.modal', function () {
+        $(this).find(':focus').blur();
+      });
       
-      // Listen for update_count events.
+      // Socket.IO connection for update badge
+      var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port);
       socket.on('update_count', function(msg) {
         document.getElementById("updateBadge").textContent = msg.count;
       });
       
+      // Initialize AG Grid for main inventory
       var columnDefs = [
-        { headerName: "figi", field: "figi", sortable: true, filter: true },
-        { headerName: "cusip", field: "cusip", sortable: true, filter: true },
-        { headerName: "sedol", field: "sedol", sortable: true, filter: true },
-        { headerName: "isin", field: "isin", sortable: true, filter: true },
-        { headerName: "company_name", field: "company_name", sortable: true, filter: true },
-        { headerName: "currency", field: "currency", sortable: true, filter: true },
-        { headerName: "asset_class", field: "asset_class", sortable: true, filter: true },
-        { headerName: "asset_group", field: "asset_group", sortable: true, filter: true }
+        { headerName: "FIGI", field: "figi", sortable: true, filter: true },
+        { headerName: "CUSIP", field: "cusip", sortable: true, filter: true },
+        { headerName: "SEDOL", field: "sedol", sortable: true, filter: true },
+        { headerName: "ISIN", field: "isin", sortable: true, filter: true },
+        { headerName: "Company Name", field: "company_name", sortable: true, filter: true },
+        { headerName: "Currency", field: "currency", sortable: true, filter: true },
+        { headerName: "Asset Class", field: "asset_class", sortable: true, filter: true },
+        { headerName: "Asset Group", field: "asset_group", sortable: true, filter: true },
+        { headerName: "APPLIED_DATE", field: "applied_date", sortable: true, filter: true }
       ];
-
       var gridOptions = {
         columnDefs: columnDefs,
         rowData: null,
@@ -139,18 +380,122 @@
                           .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(event.data[key]))
                           .join('&');
           window.location.href = "/security_detail?" + params;
-        }
+        },
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">Loading...</span>'
       };
-
       var gridDiv = document.getElementById("myGrid");
       new agGrid.Grid(gridDiv, gridOptions);
 
-      fetch("/data")
+      // Retrieve filtering parameters passed from Flask (if any)
+      var assetClassFilter = "{{ asset_class }}";
+      var assetGroupFilter = "{{ asset_group }}";
+
+      // Append filters to the /data endpoint if provided
+      var dataUrl = "/data";
+      var params = [];
+      if (assetClassFilter) {
+        params.push("asset_class=" + encodeURIComponent(assetClassFilter));
+      }
+      if (assetGroupFilter) {
+        params.push("asset_group=" + encodeURIComponent(assetGroupFilter));
+      }
+      if (params.length > 0) {
+        dataUrl += "?" + params.join("&");
+      }
+      
+      fetch(dataUrl)
         .then(response => response.json())
         .then(data => gridOptions.api.setRowData(data))
         .catch(error => console.error("Error fetching data:", error));
+      
+      // Sidebar minimization button click handler
+      $("#minimizeBtn").click(function() {
+        $("#sidebar").toggleClass("minimized");
+        if ($("#sidebar").hasClass("minimized")) {
+          $("#minimizeBtn").html('<i class="fas fa-chevron-right"></i>');
+        } else {
+          $("#minimizeBtn").html('<i class="fas fa-chevron-left"></i>');
+        }
+      });
+      
+      // --- Upload Modal Drag-and-Drop Logic ---
+      var dropzone = document.getElementById("dropzone");
+      var fileInput = document.getElementById("fileInput");
+      dropzone.addEventListener("click", function() {
+        fileInput.click();
+      });
+      dropzone.addEventListener("dragover", function(e) {
+        e.preventDefault();
+        dropzone.classList.add("dragover");
+      });
+      dropzone.addEventListener("dragleave", function(e) {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+      });
+      dropzone.addEventListener("drop", function(e) {
+        e.preventDefault();
+        dropzone.classList.remove("dragover");
+        var files = e.dataTransfer.files;
+        if (files.length) {
+          handleFileUpload(files[0]);
+        }
+      });
+      fileInput.addEventListener("change", function(e) {
+        if (fileInput.files.length) {
+          handleFileUpload(fileInput.files[0]);
+        }
+      });
+      
+      function handleFileUpload(file) {
+        var formData = new FormData();
+        formData.append("file", file);
+        fetch("/upload_soi", {
+          method: "POST",
+          body: formData
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error("Server returned " + response.status);
+          }
+          return response.json();
+        })
+        .then(result => {
+          $("#uploadModal").modal("hide");
+          showUploadSummary(result);
+        })
+        .catch(error => {
+          console.error("Error uploading file:", error);
+          alert("Error uploading file: " + error);
+        });
+      }
+      
+      function showUploadSummary(summary) {
+        var summaryText = "Total Rows: " + summary.totalRows + " | Errors: " + summary.errorCount;
+        document.getElementById("summaryText").textContent = summaryText;
+        
+        var errorColumnDefs = [
+          { headerName: "Row", field: "RowNumber", sortable: true, filter: true },
+          { headerName: "Unique Key", field: "UniqueKey", sortable: true, filter: true },
+          { headerName: "Field", field: "Field", sortable: true, filter: true },
+          { headerName: "Value", field: "FieldValue", sortable: true, filter: true },
+          { headerName: "Issue", field: "Issue", sortable: true, filter: true },
+          { headerName: "Message", field: "Message", sortable: true, filter: true }
+        ];
+        var errorGridOptions = {
+          columnDefs: errorColumnDefs,
+          rowData: summary.errorData,
+          pagination: true,
+          paginationPageSize: 10
+        };
+        var errorGridDiv = document.getElementById("errorGrid");
+        if (errorGridInstance) {
+          errorGridInstance.api.setRowData(summary.errorData);
+        } else {
+          errorGridInstance = new agGrid.Grid(errorGridDiv, errorGridOptions);
+        }
+        $("#uploadSummaryModal").modal("show");
+      }
     });
   </script>
-  
 </body>
 </html>
